@@ -11,7 +11,7 @@ export class DepositController {
     return this.depositService.createDeposit(account);
   }
 
-  @Get('all')
+  @Post('all')
   GetAll(
     @Body()
     body: {

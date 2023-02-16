@@ -34,7 +34,6 @@ export class AccountService {
     newAccount.accountType = this.accountTypeRepository.findOneById(
       account.accountTypeId,
     );
-    newAccount.balance = Number(account.balance);
     return this.accountRepository.register(newAccount);
   }
 

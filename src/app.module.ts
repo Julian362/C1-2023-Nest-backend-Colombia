@@ -21,8 +21,8 @@ import {
   DocumentTypeRepository,
   CustomerRepository,
 } from './data/persistence/repositories/';
-import { JwtModule } from '@nestjs/jwt';
 import { jwtConstants } from './business/services';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [

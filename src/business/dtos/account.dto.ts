@@ -11,10 +11,4 @@ export class AccountDTO {
 
   @IsUUID()
   customerId: string;
-
-  @IsNumberString()
-  balance: string;
-
-  @IsBoolean()
-  state: boolean;
 }

@@ -1,9 +1,8 @@
-import { IsEmail, MinLength } from 'class-validator';
+import { IsString } from 'class-validator';
 
 export class SignDTO {
-  @IsEmail()
+  @IsString()
   email: string;
-
-  @MinLength(8)
+  @IsString()
   password: string;
 }

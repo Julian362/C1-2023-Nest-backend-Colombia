@@ -24,7 +24,7 @@ export class TransferController {
     return transfer;
   }
 
-  @Get('income')
+  @Post('income')
   getHistoryIn(
     @Body()
     body: {
@@ -40,7 +40,7 @@ export class TransferController {
     );
   }
 
-  @Get('outcome')
+  @Post('outcome')
   getHistoryOut(
     @Body()
     body: {
@@ -56,7 +56,7 @@ export class TransferController {
     );
   }
 
-  @Get('history')
+  @Post('history')
   getHistory(
     @Body()
     body: {

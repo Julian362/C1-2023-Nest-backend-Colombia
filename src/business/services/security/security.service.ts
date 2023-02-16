@@ -16,10 +16,7 @@ import {
 import { AccountService } from '../account';
 
 // Entities
-import {
-  AccountTypeEntity,
-  CustomerEntity,
-} from '../../../data/persistence/entities';
+import { CustomerEntity } from '../../../data/persistence/entities';
 import { AccountDTO, CustomerDTO, SignDTO } from 'src/business/dtos';
 
 @Injectable()
@@ -46,7 +43,7 @@ export class SecurityService {
     if (answer) {
       const customer = this.customerRepository.findOneByEmail(user.email);
       const payload = { email: customer.email, sub: customer.id };
-      return { access_token: this.jwtService.sign(payload) };
+      return { access_token: this.jwtService.sign(payload), id: customer.id };
     } else throw new UnauthorizedException('Datos de identificación inválidos');
   }
 
@@ -76,10 +73,13 @@ export class SecurityService {
       newAccount.accountTypeId = 'ab27c9ac-a01c-4c22-a6d6-ce5ab3b79185';
 
       const account = this.accountService.createAccount(newAccount);
-
+      account.balance = 0;
       if (account) {
         const payload = { email: customer.email, sub: customer.id };
-        return { access_token: this.jwtService.sign(payload) };
+        return {
+          access_token: this.jwtService.sign(payload),
+          account: account,
+        };
       } else
         throw new UnauthorizedException('Datos de identificación inválidos');
     } else throw new InternalServerErrorException();
