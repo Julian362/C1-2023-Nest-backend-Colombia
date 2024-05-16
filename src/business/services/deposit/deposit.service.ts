@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { DataRangeDTO, DepositDTO, PaginationDTO } from 'src/business/dtos';
 import {
   AccountEntity,
-  DepositEntity,
+  DepositEntity
 } from '../../../data/persistence/entities';
 import {
   AccountRepository,
-  DepositRepository,
+  DepositRepository
 } from '../../../data/persistence/repositories';
 
 @Injectable()
@@ -23,16 +23,16 @@ export class DepositService {
    * @return {*}  {DepositEntity}
    * @memberof DepositService
    */
-  createDeposit(deposit: DepositDTO): DepositEntity {
+  async createDeposit(deposit: DepositDTO): Promise<DepositEntity> {
     const depositEntity = new DepositEntity();
-    depositEntity.account = this.accountRepository.findOneById(
+    depositEntity.account = await this.accountRepository.findOneById(
       deposit.accountId,
     );
     depositEntity.amount = Number(deposit.amount);
     depositEntity.dateTime = Date.now();
     let newAccount = new AccountEntity();
-    newAccount = this.accountRepository.findOneById(deposit.accountId);
-    newAccount.balance += Number(deposit.amount);
+    newAccount = await this.accountRepository.findOneById(deposit.accountId);
+    newAccount.balance = Number(newAccount.balance) + Number(deposit.amount);
     this.accountRepository.update(deposit.accountId, newAccount);
     return this.depositRepository.register(depositEntity);
   }
@@ -56,17 +56,17 @@ export class DepositService {
    * @return {*}  {DepositEntity[]}
    * @memberof DepositService
    */
-  getHistory(
+  async getHistory(
     accountId: string,
     pagination: PaginationDTO,
     dataRange?: DataRangeDTO,
-  ): DepositEntity[] {
+  ): Promise<DepositEntity[]> {
     if (dataRange) {
       const newArray = this.depositRepository.findByDataRange(
         dataRange.startDate ?? 0,
         dataRange.endDate ?? Date.now(),
       );
-      const array = newArray.filter(
+      const array = (await newArray).filter(
         (item) =>
           item.account.id === accountId &&
           (item.amount >= Number(dataRange.startAmount) ?? 0) &&
@@ -79,8 +79,7 @@ export class DepositService {
     }
     const start = pagination.length * pagination.page;
     const end = start + Number(pagination.length);
-    const array = this.depositRepository
-      .findAll()
+    const array = (await this.depositRepository.findAll())
       .filter((item) => item.account.id === accountId)
       .slice(start, end);
     return array;

@@ -1,67 +1,72 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { DocumentTypeEntity } from '../entities';
-import { BaseRepository } from './base';
 import { DocumentTypeRepositoryInterface } from './interfaces';
 
 @Injectable()
-export class DocumentTypeRepository
-  extends BaseRepository<DocumentTypeEntity>
-  implements DocumentTypeRepositoryInterface
-{
-  constructor() {
-    super();
-    this.database.push({
+export class DocumentTypeRepository implements DocumentTypeRepositoryInterface {
+  constructor(
+    @InjectRepository(DocumentTypeEntity)
+    private readonly documentTypeRepository: Repository<DocumentTypeEntity>,
+  ) {
+    this.documentTypeRepository.save({
       id: 'c822487e-5e89-4a49-98d5-50ce60b300b1',
-      name: 'Cedula de ciudadania',
+      name: 'Cédula de ciudadanía',
       state: true,
     });
-    this.database.push({
+    this.documentTypeRepository.save({
       id: '64911806-283f-4e71-ab94-f9098e18cf9a',
-      name: 'Cedula de extranjeria',
+      name: 'Cédula de extranjería',
       state: true,
     });
   }
 
-  register(entity: DocumentTypeEntity): DocumentTypeEntity {
-    this.database.push(entity);
-    return this.database.at(-1) ?? entity;
+  register(entity: DocumentTypeEntity): Promise<DocumentTypeEntity> {
+    return this.documentTypeRepository.save(entity);
   }
 
-  update(id: string, entity: DocumentTypeEntity): DocumentTypeEntity {
-    const index = this.database.findIndex((item) => item.id === id);
-    const data = this.database[index];
-    if (index >= 0) {
-      this.database[index] = {
-        ...data,
-        ...entity,
-        id,
-      } as DocumentTypeEntity;
-    } else {
-      throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
-    }
-    return this.database[index];
+  update(id: string, entity: DocumentTypeEntity): Promise<DocumentTypeEntity> {
+    return this.documentTypeRepository.update(id, entity).then((result) => {
+      if (result.affected === 0) {
+        throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
+      }
+      return entity;
+    });
   }
 
-  delete(id: string, soft?: boolean): void {
-    const index = this.database.findIndex((item) => item.id === id);
-    this.database.splice(index, 1);
+  delete(id: string) {
+    this.findOneById(id);
+    this.documentTypeRepository.delete(id).then((result) => {
+      if (result.affected === 0) {
+        throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
+      }
+    });
   }
 
-  findAll(): DocumentTypeEntity[] {
-    return this.findByState(true);
+  findAll(): Promise<DocumentTypeEntity[]> {
+    return this.documentTypeRepository.find();
   }
 
-  findOneById(id: string): DocumentTypeEntity {
-    const documentType = this.database.find((item) => item.id === id);
-    if (documentType) return documentType;
-    else throw new NotFoundException(`El ID ${id} no existe en base de datos`);
+  findOneById(id: string): Promise<DocumentTypeEntity> {
+    return this.documentTypeRepository
+      .findOne({ where: { id } })
+      .then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(
+            `El Id: ${id} no existe en base de datos`,
+          );
+        }
+      });
   }
 
-  findByState(state: boolean): DocumentTypeEntity[] {
-    return this.database.filter((item) => item.state === state);
+  findByState(state: boolean): Promise<DocumentTypeEntity[]> {
+    return this.documentTypeRepository.find({ where: { state } });
   }
 
-  findByName(name: string): DocumentTypeEntity[] {
-    return this.database.filter((item) => item.name === name);
+  findByName(name: string): Promise<DocumentTypeEntity[]> {
+    return this.documentTypeRepository.find({ where: { name } });
   }
 }

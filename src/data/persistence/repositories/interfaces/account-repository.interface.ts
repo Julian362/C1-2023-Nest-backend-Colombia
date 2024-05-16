@@ -1,9 +1,9 @@
-import { BaseRepositoryInterface } from './base/';
 import { AccountEntity } from '../../entities';
+import { BaseRepositoryInterface } from './base/';
 
 export interface AccountRepositoryInterface
   extends BaseRepositoryInterface<AccountEntity> {
-  findByState(state: boolean): AccountEntity[];
-  findByCustomer(customerId: string): AccountEntity[];
-  findByAccountType(accountTypeId: string): AccountEntity[];
+  findByState(state: boolean): Promise<AccountEntity[]>;
+  findByCustomer(customerId: string): Promise<AccountEntity[]>;
+  findByAccountType(accountTypeId: string): Promise<AccountEntity[]>;
 }

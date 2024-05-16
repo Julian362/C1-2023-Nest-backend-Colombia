@@ -1,19 +1,19 @@
-import { BaseRepositoryInterface } from './base/';
 import { TransferEntity } from '../../entities';
+import { BaseRepositoryInterface } from './base/';
 
 export interface TransferRepositoryInterface
   extends BaseRepositoryInterface<TransferEntity> {
-  findAll(): TransferEntity[];
-  findOneById(id: string): TransferEntity;
+  findAll(): Promise<TransferEntity[]>;
+  findOneById(id: string): Promise<TransferEntity>;
   findOutcomeByDataRange(
     accountId: string,
     dateInit: Date | number,
     dateEnd: Date | number,
-  ): TransferEntity[];
+  ): Promise<TransferEntity[]>;
 
   findIncomeByDataRange(
     accountId: string,
     dateInit: Date | number,
     dateEnd: Date | number,
-  ): TransferEntity[];
+  ): Promise<TransferEntity[]>;
 }

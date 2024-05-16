@@ -2,6 +2,7 @@
 import {
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -16,8 +17,8 @@ import {
 import { AccountService } from '../account';
 
 // Entities
-import { CustomerEntity } from '../../../data/persistence/entities';
 import { AccountDTO, CustomerDTO, SignDTO } from 'src/business/dtos';
+import { CustomerEntity } from '../../../data/persistence/entities';
 
 @Injectable()
 export class SecurityService {
@@ -35,13 +36,13 @@ export class SecurityService {
    * @return {*}  {string}
    * @memberof SecurityService
    */
-  signIn(user: SignDTO) {
-    const answer = this.customerRepository.findOneByEmailAndPassword(
+  async signIn(user: SignDTO) {
+    const answer = await this.customerRepository.findOneByEmailAndPassword(
       user.email,
       user.password,
     );
     if (answer) {
-      const customer = this.customerRepository.findOneByEmail(user.email);
+      const customer = await this.customerRepository.findOneByEmail(user.email);
       const payload = { email: customer.email, sub: customer.id };
       return { access_token: this.jwtService.sign(payload), id: customer.id };
     } else throw new UnauthorizedException('Datos de identificación inválidos');
@@ -54,9 +55,9 @@ export class SecurityService {
    * @return {*}  {string}
    * @memberof SecurityService
    */
-  signUp(user: CustomerDTO) {
+  async signUp(user: CustomerDTO) {
     const newCustomer = new CustomerEntity();
-    newCustomer.documentType = this.documentTypeRepository.findOneById(
+    newCustomer.documentType = await this.documentTypeRepository.findOneById(
       user.documentTypeId,
     );
     newCustomer.document = user.document;
@@ -64,15 +65,20 @@ export class SecurityService {
     newCustomer.email = user.email;
     newCustomer.phone = user.phone;
     newCustomer.password = user.password;
+    if (await this.customerRepository.existEmail(user.email)) {
+      throw new NotFoundException(
+        `El email ${user.email} ya  existe en base de datos`,
+      );
+    }
 
-    const customer = this.customerRepository.register(newCustomer);
+    const customer = await this.customerRepository.register(newCustomer);
 
     if (customer) {
       const newAccount = new AccountDTO();
       newAccount.customerId = customer.id;
       newAccount.accountTypeId = 'ab27c9ac-a01c-4c22-a6d6-ce5ab3b79185';
 
-      const account = this.accountService.createAccount(newAccount);
+      const account = await this.accountService.createAccount(newAccount);
       account.balance = 0;
       if (account) {
         const payload = { email: customer.email, sub: customer.id };

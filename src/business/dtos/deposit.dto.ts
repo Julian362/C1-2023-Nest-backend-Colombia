@@ -1,7 +1,7 @@
-import { IsNumberString, IsString, IsUUID } from 'class-validator';
+import { IsNumberString } from 'class-validator';
 
 export class DepositDTO {
-  @IsUUID()
+  @IsNumberString()
   accountId: string;
 
   @IsNumberString()

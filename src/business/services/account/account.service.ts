@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConflictException } from '@nestjs/common/exceptions';
+import { AccountDTO } from 'src/business/dtos';
 import {
   AccountEntity,
   AccountTypeEntity,
 } from '../../../data/persistence/entities';
-import { AccountDTO } from 'src/business/dtos';
 import {
   AccountRepository,
   AccountTypeRepository,
@@ -26,15 +26,22 @@ export class AccountService {
    * @return {*}  {AccountEntity}
    * @memberof AccountService
    */
-  createAccount(account: AccountDTO): AccountEntity {
+  async createAccount(account: AccountDTO): Promise<AccountEntity> {
     const newAccount = new AccountEntity();
-    newAccount.customer = this.customerRepository.findOneById(
+    newAccount.customer = await this.customerRepository.findOneById(
       account.customerId,
     );
-    newAccount.accountType = this.accountTypeRepository.findOneById(
+    newAccount.accountType = await this.accountTypeRepository.findOneById(
       account.accountTypeId,
     );
     return this.accountRepository.register(newAccount);
+  }
+
+  async CustomerBalance(id: string): Promise<boolean> {
+    const array = (await this.accountRepository.findAll()).filter(
+      (user) => user.customer.id === id && user.balance > 0,
+    );
+    return array.length <= 0;
   }
 
   /**
@@ -44,21 +51,21 @@ export class AccountService {
    * @return {*}  {number}
    * @memberof AccountService
    */
-  getBalance(accountId: string): number {
+  async getBalance(accountId: string): Promise<number> {
     if (!this.getState(accountId)) {
       throw new ConflictException(`Cuenta desactivada`);
     }
     let newAccount = new AccountEntity();
-    newAccount = this.accountRepository.findOneById(accountId);
+    newAccount = await this.accountRepository.findOneById(accountId);
     return newAccount.balance;
   }
 
-  getAccountByCustomerId(customerId: string): AccountEntity[] {
-    return this.accountRepository.findByCustomer(customerId);
+  async getAccountByCustomerId(customerId: string): Promise<AccountEntity[]> {
+    return await this.accountRepository.findByCustomer(customerId);
   }
 
-  findAll(): AccountEntity[] {
-    return this.accountRepository.findAll();
+  async findAll(): Promise<AccountEntity[]> {
+    return await this.accountRepository.findAll();
   }
 
   /**
@@ -68,12 +75,12 @@ export class AccountService {
    * @param {number} amount
    * @memberof AccountService
    */
-  addBalance(accountId: string, amount: number): void {
+  async addBalance(accountId: string, amount: number) {
     if (!this.getState(accountId)) {
       throw new ConflictException(`Cuenta desactivada`);
     }
     let newAccount = new AccountEntity();
-    newAccount = this.accountRepository.findOneById(accountId);
+    newAccount = await this.accountRepository.findOneById(accountId);
     newAccount.balance += amount;
     this.accountRepository.update(accountId, newAccount);
   }
@@ -85,13 +92,13 @@ export class AccountService {
    * @param {number} amount
    * @memberof AccountService
    */
-  removeBalance(accountId: string, amount: number): void {
+  async removeBalance(accountId: string, amount: number) {
     if (!this.getState(accountId)) {
       throw new ConflictException(`Cuenta desactivada`);
     }
-    if (this.verifyAmountIntoBalance(accountId, amount)) {
+    if (await this.verifyAmountIntoBalance(accountId, amount)) {
       let newAccount = new AccountEntity();
-      newAccount = this.accountRepository.findOneById(accountId);
+      newAccount = await this.accountRepository.findOneById(accountId);
       newAccount.balance -= Number(amount);
       this.accountRepository.update(accountId, newAccount);
     }
@@ -105,12 +112,15 @@ export class AccountService {
    * @return {*}  {boolean}
    * @memberof AccountService
    */
-  verifyAmountIntoBalance(accountId: string, amount: number): boolean {
+  async verifyAmountIntoBalance(
+    accountId: string,
+    amount: number,
+  ): Promise<boolean> {
     if (!this.getState(accountId)) {
       throw new ConflictException(`Cuenta desactivada`);
     }
     let newAccount = new AccountEntity();
-    newAccount = this.accountRepository.findOneById(accountId);
+    newAccount = await this.accountRepository.findOneById(accountId);
     if (newAccount.balance < amount) {
       return false;
     }
@@ -124,8 +134,8 @@ export class AccountService {
    * @return {*}  {boolean}
    * @memberof AccountService
    */
-  getState(accountId: string): boolean {
-    return this.accountRepository.findOneById(accountId).state;
+  async getState(accountId: string): Promise<boolean> {
+    return (await this.accountRepository.findOneById(accountId)).state;
   }
 
   /**
@@ -135,9 +145,9 @@ export class AccountService {
    * @param {boolean} state
    * @memberof AccountService
    */
-  changeState(accountId: string, state: boolean): void {
+  async changeState(accountId: string, state: boolean) {
     let newAccount = new AccountEntity();
-    newAccount = this.accountRepository.findOneById(accountId);
+    newAccount = await this.accountRepository.findOneById(accountId);
     newAccount.state = state;
     this.accountRepository.update(accountId, newAccount);
   }
@@ -149,12 +159,12 @@ export class AccountService {
    * @return {*}  {AccountTypeEntity}
    * @memberof AccountService
    */
-  getAccountType(accountId: string): AccountTypeEntity {
+  async getAccountType(accountId: string): Promise<AccountTypeEntity> {
     if (!this.getState(accountId)) {
       throw new ConflictException(`Cuenta desactivada`);
     }
     let newAccount = new AccountEntity();
-    newAccount = this.accountRepository.findOneById(accountId);
+    newAccount = await this.accountRepository.findOneById(accountId);
     const AccountTypeEntity = newAccount.accountType;
     return AccountTypeEntity;
   }
@@ -167,19 +177,22 @@ export class AccountService {
    * @return {*}  {AccountTypeEntity}
    * @memberof AccountService
    */
-  changeAccountType(
+  async changeAccountType(
     accountId: string,
     accountTypeId: string,
-  ): AccountTypeEntity {
+  ): Promise<AccountTypeEntity> {
     if (!this.getState(accountId)) {
       throw new ConflictException(`Cuenta desactivada`);
     }
     let newAccount = new AccountEntity();
-    newAccount = this.accountRepository.findOneById(accountId);
-    const accountType = this.accountTypeRepository.findOneById(accountTypeId);
+    newAccount = await this.accountRepository.findOneById(accountId);
+    const accountType = await this.accountTypeRepository.findOneById(
+      accountTypeId,
+    );
     newAccount.accountType = accountType;
 
-    return this.accountRepository.update(accountId, newAccount).accountType;
+    return (await this.accountRepository.update(accountId, newAccount))
+      .accountType;
   }
 
   /**

@@ -1,54 +1,62 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { AccountEntity } from '../entities';
-import { BaseRepository } from './base/';
 import { AccountRepositoryInterface } from './interfaces/';
 
 @Injectable()
-export class AccountRepository
-  extends BaseRepository<AccountEntity>
-  implements AccountRepositoryInterface
-{
-  register(entity: AccountEntity): AccountEntity {
-    this.database.push(entity);
-    return this.database.at(-1) ?? entity;
+export class AccountRepository implements AccountRepositoryInterface {
+  constructor(
+    @InjectRepository(AccountEntity)
+    private readonly userRepository: Repository<AccountEntity>,
+  ) {}
+
+  register(entity: AccountEntity): Promise<AccountEntity> {
+    return this.userRepository.save(entity);
   }
 
-  update(id: string, entity: AccountEntity): AccountEntity {
-    const index = this.database.findIndex(
-      (item) => item.id === id && (item.deletedAt ?? true) === true,
-    );
-    if (index >= 0) {
-      this.database[index] = {
-        ...this.database[index],
-        ...entity,
-        id,
-      } as AccountEntity;
-    } else {
-      throw new NotFoundException(`El ID ${id} no existe en base de datos`);
-    }
-    return this.database[index];
+  async update(id: string, entity: AccountEntity): Promise<AccountEntity> {
+    return this.userRepository.update(id, entity).then((result) => {
+      if (result.affected === 0) {
+        throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
+      }
+      return entity;
+    });
+  }
+
+  findOneById(id: string): Promise<AccountEntity> {
+    const deletedAt = undefined;
+    return this.userRepository
+      .findOne({
+        where: { id, deletedAt },
+      })
+      .then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(
+            `El Id: ${id} no existe en base de datos`,
+          );
+        }
+      });
   }
 
   delete(id: string, soft?: boolean): void {
     this.findOneById(id);
     if (soft || soft === undefined) {
-      const index = this.database.findIndex((item) => item.id === id);
-      this.softDelete(index);
+      this.softDelete(id);
     } else {
-      const index = this.database.findIndex(
-        (item) => item.id === id && (item.deletedAt ?? true) === true,
-      );
-      this.hardDelete(index);
+      this.hardDelete(id);
     }
   }
 
-  private hardDelete(index: number): void {
-    this.database.splice(index, 1);
+  private hardDelete(id: string): void {
+    this.userRepository.delete(id);
   }
 
-  private softDelete(index: number): void {
+  private async softDelete(id: string) {
     let newAccount = new AccountEntity();
-    const account = this.database[index];
+    const account = await this.findOneById(id);
     newAccount = {
       ...newAccount,
       ...account,
@@ -58,36 +66,32 @@ export class AccountRepository
     this.update(account.id, newAccount);
   }
 
-  findAll(): AccountEntity[] {
-    return this.database.filter((item) => item.deletedAt === undefined);
+  findAll(): Promise<AccountEntity[]> {
+    const deletedAt = undefined;
+    return this.userRepository.find({
+      where: { deletedAt },
+    });
   }
 
-  findOneById(id: string): AccountEntity {
-    const account = this.database.find(
-      (item) => item.id === id && (item.deletedAt ?? true) === true,
-    );
-    if (account) return account;
-    else throw new NotFoundException(`El ID ${id} no existe en base de datos`);
+  findByState(state: boolean): Promise<AccountEntity[]> {
+    const deletedAt = undefined;
+    return this.userRepository.find({ where: { state, deletedAt } });
   }
 
-  findByState(state: boolean): AccountEntity[] {
-    return this.database.filter(
-      (item) => item.state === state && (item.deletedAt ?? true) === true,
-    );
+  findByCustomer(customerId: string): Promise<AccountEntity[]> {
+    const deletedAt = undefined;
+    return this.userRepository.find({
+      where: { customer: { id: customerId }, deletedAt },
+      relations: [
+        'accountType',
+      ],
+    });
   }
 
-  findByCustomer(customerId: string): AccountEntity[] {
-    return this.database.filter(
-      (item) =>
-        item.customer.id === customerId && (item.deletedAt ?? true) === true,
-    );
-  }
-
-  findByAccountType(accountTypeId: string): AccountEntity[] {
-    return this.database.filter(
-      (item) =>
-        item.accountType.id === accountTypeId &&
-        (item.deletedAt ?? true) === true,
-    );
+  findByAccountType(accountTypeId: string): Promise<AccountEntity[]> {
+    const deletedAt = undefined;
+    return this.userRepository.find({
+      where: { accountType: { id: accountTypeId }, deletedAt },
+    });
   }
 }

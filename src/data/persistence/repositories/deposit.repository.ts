@@ -1,88 +1,101 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Between, Repository } from 'typeorm';
 import { DepositEntity } from '../entities';
-import { BaseRepository } from './base/';
 import { DepositRepositoryInterface } from './interfaces/';
 
 @Injectable()
-export class DepositRepository
-  extends BaseRepository<DepositEntity>
-  implements DepositRepositoryInterface
-{
-  register(entity: DepositEntity): DepositEntity {
-    this.database.push(entity);
-    return this.database.at(-1) ?? entity;
+export class DepositRepository implements DepositRepositoryInterface {
+  constructor(
+    @InjectRepository(DepositEntity)
+    private readonly depositRepository: Repository<DepositEntity>,
+  ) {}
+  register(entity: DepositEntity): Promise<DepositEntity> {
+    return this.depositRepository.save(entity);
   }
 
-  update(id: string, entity: DepositEntity): DepositEntity {
-    const index = this.database.findIndex(
-      (item) => item.id === id && (item.deletedAt ?? true) === true,
-    );
-    if (index >= 0) {
-      this.database[index] = {
-        ...this.database[index],
-        ...entity,
-        id,
-      } as DepositEntity;
-    } else {
-      throw new NotFoundException(`El ID ${id} no existe en base de datos`);
-    }
-    return this.database[index];
+  update(id: string, entity: DepositEntity): Promise<DepositEntity> {
+    return this.depositRepository.update(id, entity).then((result) => {
+      if (result.affected === 0) {
+        throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
+      }
+      return entity;
+    });
   }
 
   delete(id: string, soft?: boolean): void {
     this.findOneById(id);
     if (soft || soft === undefined) {
-      const index = this.database.findIndex((item) => item.id === id);
-      this.softDelete(index);
+      this.softDelete(id);
     } else {
-      const index = this.database.findIndex(
-        (item) => item.id === id && (item.deletedAt ?? true) === true,
-      );
-      this.hardDelete(index);
+      this.hardDelete(id);
     }
   }
 
-  private hardDelete(index: number): void {
-    this.database.splice(index, 1);
+  private hardDelete(id: string) {
+    this.depositRepository.delete({
+      id,
+    });
   }
 
-  private softDelete(index: number): void {
+  private softDelete(id: string) {
     let newDeposit = new DepositEntity();
-    const deposit = this.database[index];
-    newDeposit = {
-      ...newDeposit,
-      ...deposit,
-      id: deposit.id,
-    };
-    newDeposit.deletedAt = Date.now();
-    this.update(deposit.id, newDeposit);
+    this.depositRepository
+      .findOne({
+        where: { id },
+      })
+      .then((result) => {
+        if (result) {
+          newDeposit = {
+            ...newDeposit,
+            ...result,
+            id: result.id,
+          };
+          newDeposit.deletedAt = Date.now();
+          this.update(result.id, newDeposit);
+        } else {
+          throw new NotFoundException(
+            `El Id: ${id} no existe en base de datos`,
+          );
+        }
+      });
   }
 
-  findAll(): DepositEntity[] {
-    return this.database.filter((item) => item.deletedAt === undefined);
+  findAll(): Promise<DepositEntity[]> {
+        return this.depositRepository.find({ where: { deletedAt: undefined }, relations: ['account']});
   }
 
-  findOneById(id: string): DepositEntity {
-    const account = this.database.find(
-      (item) => item.id === id && (item.deletedAt ?? true) === true,
-    );
-    if (account) return account;
-    else throw new NotFoundException(`El ID ${id} no existe en base de datos`);
+  async findOneById(id: string): Promise<DepositEntity> {
+    return this.depositRepository
+      .findOne({
+        where: { id, deletedAt: undefined },
+        relations: ['account'],
+      })
+      .then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(`El ID ${id} no existe en base de datos`);
+        }
+      });
   }
 
-  findByAccountId(accountId: string): DepositEntity[] {
-    return this.database.filter(
-      (item) => item.account.id === accountId && item.deletedAt === undefined,
-    );
+  findByAccountId(accountId: string): Promise<DepositEntity[]> {
+    return this.depositRepository.find({
+      where: { account: { id: accountId }, deletedAt: undefined },
+      relations: ['account'],
+    });
   }
 
   findByDataRange(
     dateInit: Date | number,
     dateEnd: Date | number,
-  ): DepositEntity[] {
-    return this.findAll().filter(
-      (item) =>
-        item.dateTime >= Number(dateInit) && item.dateTime <= Number(dateEnd),
-    );
+  ): Promise<DepositEntity[]> {
+    return this.depositRepository.find({
+      where: {
+        dateTime: Between(dateInit, dateEnd),
+      },
+      relations: ['account'],
+    });
   }
 }

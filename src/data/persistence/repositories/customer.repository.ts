@@ -1,54 +1,58 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CustomerEntity } from '../entities';
-import { BaseRepository } from './base/';
 import { CustomerRepositoryInterface } from './interfaces/';
 
 @Injectable()
-export class CustomerRepository
-  extends BaseRepository<CustomerEntity>
-  implements CustomerRepositoryInterface
-{
-  register(entity: CustomerEntity): CustomerEntity {
-    this.database.push(entity);
-    return this.database.at(-1) ?? entity;
+export class CustomerRepository implements CustomerRepositoryInterface {
+  constructor(
+    @InjectRepository(CustomerEntity)
+    private readonly customerRepository: Repository<CustomerEntity>,
+  ) {}
+
+  register(entity: CustomerEntity): Promise<CustomerEntity> {
+    console.log(entity)
+    return this.customerRepository.save(entity);
   }
 
-  update(id: string, entity: CustomerEntity): CustomerEntity {
-    const index = this.database.findIndex(
-      (item) => item.id === id && (item.deletedAt ?? true) === true,
-    );
-    if (index >= 0) {
-      this.database[index] = {
-        ...this.database[index],
-        ...entity,
-        id,
-      } as CustomerEntity;
-    } else {
-      throw new NotFoundException(`El ID ${id} no existe en base de datos`);
-    }
-    return this.database[index];
+  async update(id: string, entity: CustomerEntity): Promise<CustomerEntity> {
+    return this.customerRepository.update(id, entity).then((result) => {
+      if (result.affected === 0) {
+        throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
+      }
+      return entity;
+    });
   }
 
-  delete(id: string, soft?: boolean): void {
+  delete(id: string, soft?: boolean) {
     this.findOneById(id);
     if (soft || soft === undefined) {
-      const index = this.database.findIndex((item) => item.id === id);
-      this.softDelete(index);
+      this.softDelete(id);
     } else {
-      const index = this.database.findIndex(
-        (item) => item.id === id && (item.deletedAt ?? true) === true,
-      );
-      this.hardDelete(index);
+      this.hardDelete(id);
     }
   }
 
-  private hardDelete(index: number): void {
-    this.database.splice(index, 1);
+  private hardDelete(id: string): void {
+    this.customerRepository.delete(id);
   }
 
-  private softDelete(index: number): void {
+  private async softDelete(id: string) {
     let newCustomer = new CustomerEntity();
-    const customer = this.database[index];
+    const customer = await this.customerRepository
+      .findOne({
+        where: { id },
+      })
+      .then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(
+            `El Id: ${id} no existe en base de datos`,
+          );
+        }
+      });
     newCustomer = {
       ...newCustomer,
       ...customer,
@@ -58,77 +62,109 @@ export class CustomerRepository
     this.update(customer.id, newCustomer);
   }
 
-  findAll(): CustomerEntity[] {
-    return this.database.filter((item) => (item.deletedAt ?? true) === true);
+  findAll(): Promise<CustomerEntity[]> {
+    const deletedAt = undefined;
+    return this.customerRepository.find({ where: { deletedAt } });
+  }
+  findAllDeleted(): Promise<CustomerEntity[]> {
+    return this.customerRepository.find({
+      where: { deletedAt: undefined },
+    });
   }
 
-  findOneById(id: string): CustomerEntity {
-    const customer = this.database.find(
-      (item) => item.id === id && (item.deletedAt ?? true) === true,
-    );
+  async findOneById(id: string): Promise<CustomerEntity> {
+    const customer = await this.customerRepository.findOne({
+      where: { id, deletedAt: undefined },
+    });
     if (customer) return customer;
     else throw new NotFoundException(`El ID ${id} no existe en base de datos`);
   }
 
-  findOneByEmailAndPassword(email: string, password: string): boolean {
-    const index = this.database.findIndex(
-      (item) =>
-        item.email === email &&
-        item.password === password &&
-        typeof item.deletedAt === 'undefined',
-    );
-    return index >= 0 ? true : false;
+  async findOneByEmailAndPassword(
+    email: string,
+    password: string,
+  ): Promise<boolean> {
+    return this.customerRepository
+      .find({
+        where: { email, password, deletedAt: undefined },
+      })
+      .then((result) => {
+        if (result.length > 0) {
+          return true;
+        } else {
+          return false;
+        }
+      });
   }
 
-  findOneByDocumentTypeAndDocument(
+  async findOneByDocumentTypeAndDocument(
     documentTypeId: string,
     document: string,
-  ): CustomerEntity {
-    const index = this.database.findIndex(
-      (item) =>
-        item.documentType.id === documentTypeId &&
-        item.document === document &&
-        typeof item.deletedAt === 'undefined',
-    );
-    if (index >= 0) {
+  ): Promise<CustomerEntity> {
+    const result = await this.customerRepository.findOne({
+      where: {
+        documentType: { id: documentTypeId },
+        document,
+        deletedAt: undefined,
+      },
+    });
+    if (result) {
+      return result;
+    } else {
       throw new NotFoundException(`no existe en base de datos`);
     }
-    const customer = this.database[index];
-    return customer;
   }
 
-  findOneByEmail(email: string): CustomerEntity {
-    const index = this.database.findIndex(
-      (item) => item.email === email && typeof item.deletedAt === 'undefined',
-    );
-    if (index < 0) {
-      throw new NotFoundException(`no existe en base de datos`);
-    }
-    const customer = this.database[index];
-    return customer;
+  async findOneByEmail(email: string): Promise<CustomerEntity> {
+    return this.customerRepository
+      .findOne({
+        where: { email, deletedAt: undefined },
+      })
+      .then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(`no existe en base de datos`);
+        }
+      });
+  }
+  async existEmail(email: string): Promise<boolean> {
+    return this.customerRepository
+      .find({
+        where: { email, deletedAt: undefined },
+      })
+      .then((result) => {
+        if (result.length > 0) {
+          return true;
+        } else {
+          return false;
+        }
+      });
   }
 
-  findOneByPhone(phone: string): CustomerEntity {
-    const index = this.database.findIndex(
-      (item) => item.phone === phone && typeof item.deletedAt === 'undefined',
-    );
-    if (index >= 0) {
-      throw new NotFoundException(`no existe en base de datos`);
-    }
-    const customer = this.database[index];
-    return customer;
+  async findOneByPhone(phone: string): Promise<CustomerEntity> {
+    return this.customerRepository
+      .findOne({
+        where: { phone, deletedAt: undefined },
+      })
+      .then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(`no existe en base de datos`);
+        }
+      });
   }
 
-  findByState(state: boolean): CustomerEntity[] {
-    return this.database.filter(
-      (item) => item.state === state && typeof item.deletedAt === 'undefined',
-    );
+  findByState(state: boolean): Promise<CustomerEntity[]> {
+    return this.customerRepository.find({
+      where: { state, deletedAt: undefined },
+    });
   }
 
-  findByFullName(fullName: string): CustomerEntity[] {
-    return this.database.filter(
-      (item) =>
-        item.fullName === fullName && typeof item.deletedAt === 'undefined',
-    );
+  findByFullName(fullName: string): Promise<CustomerEntity[]> {
+    return this.customerRepository.find({
+      where: { fullName, deletedAt: undefined },
+    });
   }
 }

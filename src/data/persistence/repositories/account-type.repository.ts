@@ -1,69 +1,75 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AccountTypeEntity as AccountTypeEntity } from '../entities';
-import { BaseRepository } from './base/';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { AccountTypeEntity } from '../entities/account-type.entity';
 import { AccountTypeRepositoryInterface } from './interfaces/';
 @Injectable()
-export class AccountTypeRepository
-  extends BaseRepository<AccountTypeEntity>
-  implements AccountTypeRepositoryInterface
-{
-  constructor() {
-    super();
-    this.database.push({
+export class AccountTypeRepository implements AccountTypeRepositoryInterface {
+  constructor(
+    @InjectRepository(AccountTypeEntity)
+    private readonly userRepository: Repository<AccountTypeEntity>,
+  ) {
+    this.register({
       id: 'ab27c9ac-a01c-4c22-a6d6-ce5ab3b79185',
-      name: 'Cuenta de ahorrros',
+      name: 'Cuenta de ahorros',
       state: true,
     });
-    this.database.push({
+
+    this.register({
       id: '10b6c590-85fa-4621-b85a-4021e882c080',
       name: 'Cuenta corriente',
       state: true,
     });
   }
-
-  register(entity: AccountTypeEntity): AccountTypeEntity {
-    this.database.push(entity);
-    return this.database.at(-1) ?? entity;
+  findAll(): Promise<AccountTypeEntity[]> {
+    return this.userRepository.find();
   }
 
-  update(id: string, entity: AccountTypeEntity): AccountTypeEntity {
-    const index = this.database.findIndex((item) => item.id === id);
-    const data = this.database[index];
-    if (index >= 0) {
-      this.database[index] = {
-        ...data,
-        ...entity,
-        id,
-      } as AccountTypeEntity;
-    } else {
-      throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
-    }
-    return this.database[index];
+  register(entity: AccountTypeEntity): Promise<AccountTypeEntity> {
+    return this.userRepository.save(entity);
   }
 
-  delete(id: string, soft?: boolean): void {
-    const index = this.database.findIndex((item) => item.id === id);
-    this.database.splice(index, 1);
+  async update(
+    id: string,
+    entity: AccountTypeEntity,
+  ): Promise<AccountTypeEntity> {
+    return this.userRepository.update(id, entity).then((result) => {
+      if (result.affected === 0) {
+        throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
+      }
+      return entity;
+    });
   }
 
-  findAll(): AccountTypeEntity[] {
-    return this.database;
+  delete(id: string): void {
+    this.userRepository.delete(id).then((result) => {
+      if (result.affected === 0) {
+        throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
+      }
+    });
   }
 
-  findOneById(id: string): AccountTypeEntity {
-    const index = this.database.findIndex((item) => item.id === id);
-    if (index >= 0) {
-      return this.database[index];
-    } else {
-      throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
-    }
+  async findOneById(id: string): Promise<AccountTypeEntity> {
+    return this.userRepository
+      .findOne({
+        where: { id },
+      })
+      ?.then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(
+            `El Id: ${id} no existe en base de datos`,
+          );
+        }
+      });
   }
 
-  findByState(state: boolean): AccountTypeEntity[] {
-    return this.database.filter((item) => item.state === state);
+  findByState(state: boolean): Promise<AccountTypeEntity[]> {
+    return this.userRepository.find({ where: { state } });
   }
 
-  findByName(name: string): AccountTypeEntity[] {
-    return this.database.filter((item) => item.name === name);
+  findByName(name: string): Promise<AccountTypeEntity[]> {
+    return this.userRepository.find({ where: { name } });
   }
 }

@@ -1,38 +1,50 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { DataRangeDTO, PaginationDTO, TransferDTO } from 'src/business/dtos';
-import { TransferEntity } from '../../../data/persistence/entities';
+import { GuardsGuard } from 'src/presentation/guards/guards.guard';
 import { TransferService } from '../../../business/services';
+import { TransferEntity } from '../../../data/persistence/entities';
 
 @Controller('transfer')
 export class TransferController {
   constructor(private readonly transferService: TransferService) {}
 
   @Post()
-  createTransfer(@Body() transfer: TransferDTO): TransferEntity {
+  @UseGuards(GuardsGuard)
+  async createTransfer(@Body() transfer: TransferDTO): Promise<TransferEntity> {
     return this.transferService.createTransfer(transfer);
   }
 
   @Get('/select/:id')
-  selectTransfer(@Param('id') id: string): TransferEntity {
+  @UseGuards(GuardsGuard)
+  async selectTransfer(@Param('id') id: string): Promise<TransferEntity> {
     return this.transferService.selectTransfer(id);
   }
 
   @Delete(':id')
-  deleteTransfer(@Param('id') id: string): TransferEntity {
-    const transfer = this.transferService.selectTransfer(id);
+  async deleteTransfer(@Param('id') id: string): Promise<TransferEntity> {
+    const transfer = await this.transferService.selectTransfer(id);
     this.transferService.deleteTransfer(id);
     return transfer;
   }
 
   @Post('income')
-  getHistoryIn(
+  @UseGuards(GuardsGuard)
+  async getHistoryIn(
     @Body()
     body: {
       accountId: string;
       pagination: PaginationDTO;
       dataRange?: DataRangeDTO;
     },
-  ): TransferEntity[] {
+  ): Promise<TransferEntity[]> {
     return this.transferService.getHistoryIn(
       body.accountId,
       body.pagination,
@@ -41,14 +53,15 @@ export class TransferController {
   }
 
   @Post('outcome')
-  getHistoryOut(
+  @UseGuards(GuardsGuard)
+  async getHistoryOut(
     @Body()
     body: {
       accountId: string;
       pagination: PaginationDTO;
       dataRange?: DataRangeDTO;
     },
-  ): TransferEntity[] {
+  ): Promise<TransferEntity[]> {
     return this.transferService.getHistoryOut(
       body.accountId,
       body.pagination,
@@ -57,6 +70,7 @@ export class TransferController {
   }
 
   @Post('history')
+  @UseGuards(GuardsGuard)
   getHistory(
     @Body()
     body: {
@@ -64,7 +78,7 @@ export class TransferController {
       pagination: PaginationDTO;
       dataRange?: DataRangeDTO;
     },
-  ): TransferEntity[] {
+  ): Promise<TransferEntity[]> {
     return this.transferService.getHistory(
       body.accountId,
       body.pagination,

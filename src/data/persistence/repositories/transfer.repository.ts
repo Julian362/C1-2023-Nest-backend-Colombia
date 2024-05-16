@@ -1,54 +1,58 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Between, Repository } from 'typeorm';
 import { TransferEntity } from '../entities';
-import { BaseRepository } from './base/';
 import { TransferRepositoryInterface } from './interfaces';
 
 @Injectable()
-export class TransferRepository
-  extends BaseRepository<TransferEntity>
-  implements TransferRepositoryInterface
-{
-  register(entity: TransferEntity): TransferEntity {
-    this.database.push(entity);
-    return this.database.at(-1) ?? entity;
+export class TransferRepository implements TransferRepositoryInterface {
+  constructor(
+    @InjectRepository(TransferEntity)
+    private readonly transferRepository: Repository<TransferEntity>,
+  ) {}
+  register(entity: TransferEntity): Promise<TransferEntity> {
+    return this.transferRepository.save(entity);
   }
 
-  update(id: string, entity: TransferEntity): TransferEntity {
-    const index = this.database.findIndex(
-      (item) => item.id === id && (item.deletedAt ?? true) === true,
-    );
-    if (index >= 0) {
-      this.database[index] = {
-        ...this.database[index],
-        ...entity,
-        id,
-      } as TransferEntity;
-    } else {
-      throw new NotFoundException(`El ID ${id} no existe en base de datos`);
-    }
-    return this.database[index];
+  update(id: string, entity: TransferEntity): Promise<TransferEntity> {
+    return this.transferRepository.update(id, entity).then((result) => {
+      if (result.affected === 0) {
+        throw new NotFoundException(`El Id: ${id} no existe en base de datos`);
+      }
+      return entity;
+    });
   }
 
-  delete(id: string, soft?: boolean): void {
+  delete(id: string, soft?: boolean) {
     this.findOneById(id);
     if (soft || soft === undefined) {
-      const index = this.database.findIndex((item) => item.id === id);
-      this.softDelete(index);
+      this.softDelete(id);
     } else {
-      const index = this.database.findIndex(
-        (item) => item.id === id && (item.deletedAt ?? true) === true,
-      );
-      this.hardDelete(index);
+      this.hardDelete(id);
     }
   }
 
-  private hardDelete(index: number): void {
-    this.database.splice(index, 1);
+  private hardDelete(id: string) {
+    this.transferRepository.delete({
+      id,
+    });
   }
 
-  private softDelete(index: number): void {
+  private async softDelete(id: string) {
     let newTransfer = new TransferEntity();
-    const transfer = this.database[index];
+    const transfer = await this.transferRepository
+      .findOne({
+        where: { id },
+      })
+      .then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(
+            `El Id: ${id} no existe en base de datos`,
+          );
+        }
+      });
     newTransfer = {
       ...newTransfer,
       ...transfer,
@@ -58,51 +62,69 @@ export class TransferRepository
     this.update(transfer.id, newTransfer);
   }
 
-  findAll(): TransferEntity[] {
-    return this.database.filter((item) => item.deletedAt === undefined);
+  findAll(): Promise<TransferEntity[]> {
+    return this.transferRepository.find({
+      where: { deletedAt: undefined },
+    });
   }
 
-  findOneById(id: string): TransferEntity {
-    const account = this.database.find(
-      (item) => item.id === id && (item.deletedAt ?? true) === true,
-    );
-    if (account) return account;
-    else throw new NotFoundException(`El ID ${id} no existe en base de datos`);
+  async findOneById(id: string): Promise<TransferEntity> {
+    return this.transferRepository
+      .findOne({
+        where: { id, deletedAt: undefined },
+        relations: ['inCome', 'outCome'],
+      })
+      .then((result) => {
+        if (result) {
+          return result;
+        } else {
+          throw new NotFoundException(
+            `El Id: ${id} no existe en base de datos`,
+          );
+        }
+      });
   }
 
   findOutcomeByDataRange(
     accountId: string,
     dateInit: Date | number,
     dateEnd: Date | number,
-  ): TransferEntity[] {
-    return this.database.filter(
-      (item) =>
-        item.dateTime >= dateInit &&
-        item.dateTime <= dateEnd &&
-        item.outCome.id === accountId,
-    );
+  ): Promise<TransferEntity[]> {
+    return this.transferRepository.find({
+      where: {
+        dateTime: Between(dateInit, dateEnd),
+        outCome: { id: accountId },
+        
+      },
+      relations: ['inCome', 'outCome'],
+    });
   }
 
   findIncomeByDataRange(
     accountId: string,
     dateInit: Date | number,
     dateEnd: Date | number,
-  ): TransferEntity[] {
-    return this.database.filter(
-      (item) =>
-        item.dateTime >= dateInit &&
-        item.dateTime <= dateEnd &&
-        item.inCome.id === accountId,
-    );
+  ): Promise<TransferEntity[]> {
+    return this.transferRepository.find({
+      where: {
+        dateTime: Between(dateInit, dateEnd),
+        inCome: { id: accountId },
+      },
+      relations: ['inCome', 'outCome'],
+
+    });
   }
 
   findByDataRange(
     dateInit: Date | number,
     dateEnd: Date | number,
-  ): TransferEntity[] {
-    return this.findAll().filter(
-      (item) =>
-        item.dateTime >= Number(dateInit) && item.dateTime <= Number(dateEnd),
-    );
+  ): Promise<TransferEntity[]> {
+    return this.transferRepository.find({
+      where: {
+        dateTime: Between(dateInit, dateEnd),
+      },
+      relations: ['inCome', 'outCome'],
+
+    });
   }
 }

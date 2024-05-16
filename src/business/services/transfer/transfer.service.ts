@@ -3,13 +3,13 @@ import { TransferDTO } from 'src/business/dtos';
 import {
   DataRangeModel,
   PaginationModel,
-  TransferModel,
+  TransferModel
 } from '../../../data/models';
 import { TransferEntity } from '../../../data/persistence/entities';
 import {
   AccountRepository,
-  TransferRepository,
   DepositRepository,
+  TransferRepository
 } from '../../../data/persistence/repositories';
 @Injectable()
 export class TransferService {
@@ -25,19 +25,21 @@ export class TransferService {
    * @return {*}  {TransferEntity}
    * @memberof TransferService
    */
-  createTransfer(transfer: TransferDTO): TransferModel {
+  async createTransfer(transfer: TransferDTO): Promise<TransferModel> {
     const newTransfer = new TransferEntity();
-    const inCome = this.accountRepository.findOneById(transfer.inComeId);
-    const outCome = this.accountRepository.findOneById(transfer.outComeId);
+    const inCome = await this.accountRepository.findOneById(transfer.inComeId);
+    const outCome = await this.accountRepository.findOneById(
+      transfer.outComeId,
+    );
     if (outCome.balance > Number(transfer.amount)) {
       newTransfer.inCome = inCome;
       newTransfer.outCome = outCome;
       newTransfer.amount = Number(transfer.amount);
       newTransfer.reason = transfer.reason;
-      outCome.balance -= Number(transfer.amount);
+      outCome.balance = Number(outCome.balance) - Number(transfer.amount);
       this.accountRepository.update(outCome.id, outCome);
       this.accountRepository.update(outCome.id, outCome);
-      inCome.balance += Number(transfer.amount);
+      inCome.balance = Number(inCome.balance) +Number(transfer.amount);
       this.accountRepository.update(inCome.id, inCome);
       newTransfer.dateTime = Date.now();
       return this.transferRepository.register(newTransfer);
@@ -55,24 +57,24 @@ export class TransferService {
    * @return {*}  {TransferEntity[]}
    * @memberof TransferService
    */
-  getHistoryOut(
+  async getHistoryOut(
     accountId: string,
     pagination: PaginationModel,
     dataRange?: DataRangeModel,
-  ): TransferEntity[] {
+  ): Promise<TransferEntity[]> {
     if (dataRange) {
-      const array = this.transferRepository
-        .findOutcomeByDataRange(
+      const array = (
+        await this.transferRepository.findOutcomeByDataRange(
           accountId,
           dataRange.startDate ?? 0,
           dataRange.endDate ?? Date.now(),
         )
-        .filter(
-          (item) =>
-            item.outCome.id === accountId &&
-            item.amount > (dataRange.startAmount ?? 0) &&
-            item.amount < (dataRange.endAmount ?? Number.MAX_SAFE_INTEGER),
-        );
+      ).filter(
+        (item) =>
+          item.outCome.id === accountId &&
+          item.amount > (dataRange.startAmount ?? 0) &&
+          item.amount < (dataRange.endAmount ?? Number.MAX_SAFE_INTEGER),
+      );
       return array.slice(
         pagination.length * pagination.page,
         pagination.length * pagination.page + pagination.length,
@@ -90,24 +92,24 @@ export class TransferService {
    * @return {*}  {TransferEntity[]}
    * @memberof TransferService
    */
-  getHistoryIn(
+  async getHistoryIn(
     accountId: string,
     pagination: PaginationModel,
     dataRange?: DataRangeModel,
-  ): TransferEntity[] {
+  ): Promise<TransferEntity[]> {
     if (dataRange) {
-      const array = this.transferRepository
-        .findIncomeByDataRange(
+      const array = (
+        await this.transferRepository.findIncomeByDataRange(
           accountId,
           dataRange.startDate ?? 0,
           dataRange.endDate ?? Date.now(),
         )
-        .filter(
-          (item) =>
-            item.inCome.id === accountId &&
-            item.amount > (dataRange.startAmount ?? 0) &&
-            item.amount < (dataRange.endAmount ?? Number.MAX_SAFE_INTEGER),
-        );
+      ).filter(
+        (item) =>
+          item.inCome.id === accountId &&
+          item.amount > (dataRange.startAmount ?? 0) &&
+          item.amount < (dataRange.endAmount ?? Number.MAX_SAFE_INTEGER),
+      );
       return array.slice(
         pagination.length * pagination.page,
         pagination.length * pagination.page + pagination.length,
@@ -125,17 +127,17 @@ export class TransferService {
    * @return {*}  {TransferEntity[]}
    * @memberof TransferService
    */
-  getHistory(
+  async getHistory(
     accountId: string,
     pagination: PaginationModel,
     dataRange?: DataRangeModel,
-  ): TransferEntity[] {
+  ): Promise<TransferEntity[]> {
     if (dataRange) {
       const newArray = this.transferRepository.findByDataRange(
         dataRange.startDate ?? 0,
         dataRange.endDate ?? Date.now(),
       );
-      const array = newArray.filter(
+      const array = (await newArray).filter(
         (item) =>
           (item.inCome.id === accountId || item.outCome.id === accountId) &&
           (item.amount >= Number(dataRange.startAmount) ?? 0) &&
@@ -148,8 +150,7 @@ export class TransferService {
     }
     const start = pagination.length * pagination.page;
     const end = start + Number(pagination.length);
-    const array = this.transferRepository
-      .findAll()
+    const array = (await this.transferRepository.findAll())
       .filter(
         (item) => item.inCome.id === accountId || item.outCome.id === accountId,
       )
@@ -167,7 +168,7 @@ export class TransferService {
     this.transferRepository.delete(transferId);
   }
 
-  selectTransfer(transferId: string): TransferEntity {
-    return this.transferRepository.findOneById(transferId);
+  async selectTransfer(transferId: string): Promise<TransferEntity> {
+    return await this.transferRepository.findOneById(transferId);
   }
 }

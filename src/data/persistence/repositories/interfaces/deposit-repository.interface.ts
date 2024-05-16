@@ -1,11 +1,11 @@
-import { BaseRepositoryInterface } from './base/';
 import { DepositEntity } from '../../entities';
+import { BaseRepositoryInterface } from './base/';
 
 export interface DepositRepositoryInterface
   extends BaseRepositoryInterface<DepositEntity> {
-  findByAccountId(accountId: string): DepositEntity[];
+  findByAccountId(accountId: string): Promise<DepositEntity[]>;
   findByDataRange(
     dateInit: Date | number,
     dateEnd: Date | number,
-  ): DepositEntity[];
+  ): Promise<DepositEntity[]>;
 }

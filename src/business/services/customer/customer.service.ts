@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CustomerDTO } from 'src/business/dtos';
 import { CustomerUpdateDTO } from 'src/business/dtos/update-customer.dto';
 import {
@@ -27,15 +27,22 @@ export class CustomerService {
    * @return {*}  {CustomerEntity}
    * @memberof CustomerService
    */
-  getCustomerInfo(customerId: string): CustomerEntity {
-    const newCustomer = this.customerRepository.findOneById(customerId);
+  async getCustomerInfo(customerId: string): Promise<CustomerEntity> {
+    const newCustomer = await this.customerRepository.findOneById(customerId);
+    return newCustomer;
+  }
+  async getCustomerInfoByEmail(email: string): Promise<CustomerEntity> {
+    const newCustomer = await this.customerRepository.findOneByEmail(email);
     return newCustomer;
   }
 
-  findAll(): CustomerEntity[] {
-    return this.customerRepository
-      .findAll()
-      .filter((item) => (item.deletedAt ?? true) === true);
+  async findAll(): Promise<CustomerEntity[]> {
+    return (await this.customerRepository.findAll()).filter(
+      (item) => (item.deletedAt ?? true) === true,
+    );
+  }
+  findAllDeleted(): Promise<CustomerEntity[]> {
+    return this.customerRepository.findAllDeleted();
   }
 
   transform(customer: CustomerDTO): CustomerEntity {
@@ -51,10 +58,10 @@ export class CustomerService {
     return newCustomer;
   }
 
-  newCustomer(customer: CustomerDTO): {
+  async newCustomer(customer: CustomerDTO): Promise<{
     customer: CustomerEntity;
     account: AccountEntity;
-  } {
+  }> {
     const documentType = new DocumentTypeEntity();
     documentType.id = customer.documentTypeId;
 
@@ -62,16 +69,21 @@ export class CustomerService {
     newCustomer.documentType = documentType;
     newCustomer.document = customer.document;
     newCustomer.fullName = customer.fullName;
+    if (await this.customerRepository.existEmail(customer.email)) {
+      throw new NotFoundException(
+        `El email ${customer.email} ya  existe en base de datos`,
+      );
+    }
     newCustomer.email = customer.email;
     newCustomer.phone = customer.phone;
     newCustomer.password = customer.password;
     const typeId = 'ab27c9ac-a01c-4c22-a6d6-ce5ab3b79185';
     const account = new AccountEntity();
-    account.accountType = this.accountTypeRepository.findOneById(typeId);
+    account.accountType = await this.accountTypeRepository.findOneById(typeId);
     account.customer = newCustomer;
     return {
-      customer: this.customerRepository.register(newCustomer),
-      account: this.accountRepository.register(account),
+      customer: await this.customerRepository.register(newCustomer),
+      account: await this.accountRepository.register(account),
     };
   }
 
@@ -83,13 +95,16 @@ export class CustomerService {
    * @return {*}  {CustomerEntity}
    * @memberof CustomerService
    */
-  updatedCustomer(id: string, customer: CustomerUpdateDTO): CustomerEntity {
-    if (this.customerRepository.findOneById(id)) {
+  async updatedCustomer(
+    id: string,
+    customer: CustomerUpdateDTO,
+  ): Promise<CustomerEntity> {
+    if (await this.customerRepository.findOneById(id)) {
       const newCustomer = new CustomerEntity();
       newCustomer.document = customer.document;
       newCustomer.fullName = customer.fullName;
-      newCustomer.email = customer.email;
       newCustomer.phone = customer.phone;
+      newCustomer.password = customer.password;
       return this.customerRepository.update(id, newCustomer);
     }
     return new CustomerEntity();
@@ -102,9 +117,11 @@ export class CustomerService {
    * @return {*}  {boolean}
    * @memberof CustomerService
    */
-  unsuscribe(id: string): boolean {
-    if (this.customerRepository.findOneById(id).deletedAt === undefined) {
-      const customer = this.customerRepository.findOneById(id);
+  async unsuscribe(id: string): Promise<boolean> {
+    if (
+      (await this.customerRepository.findOneById(id)).deletedAt === undefined
+    ) {
+      const customer = await this.customerRepository.findOneById(id);
       customer.state = false;
       this.customerRepository.update(id, customer);
       return true;
@@ -112,9 +129,14 @@ export class CustomerService {
     return false;
   }
 
-  deleteCustomer(id: string): boolean {
-    if (this.customerRepository.findOneById(id).deletedAt === undefined) {
-      this.customerRepository.delete(id, true);
+  async deleteCustomer(id: string): Promise<boolean> {
+    if (
+      (await this.customerRepository.findOneById(id)).deletedAt === undefined
+    ) {
+      (await this.accountRepository.findAll()).map(
+        (mapa) => (mapa.deletedAt = Date.now()),
+      );
+      this.customerRepository.delete(id);
       return true;
     }
     return false;

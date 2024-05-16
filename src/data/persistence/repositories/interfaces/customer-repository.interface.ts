@@ -1,15 +1,15 @@
-import { BaseRepositoryInterface } from './base/';
 import { CustomerEntity } from '../../entities';
+import { BaseRepositoryInterface } from './base/';
 
 export interface CustomerRepositoryInterface
   extends BaseRepositoryInterface<CustomerEntity> {
-  findOneByEmailAndPassword(email: string, password: string): boolean;
+  findOneByEmailAndPassword(email: string, password: string): Promise<boolean>;
   findOneByDocumentTypeAndDocument(
     documentTypeId: string,
     document: string,
-  ): CustomerEntity;
-  findOneByEmail(email: string): CustomerEntity;
-  findOneByPhone(phone: string): CustomerEntity;
-  findByState(state: boolean): CustomerEntity[];
-  findByFullName(fullName: string): CustomerEntity[];
+  ): Promise<CustomerEntity>;
+  findOneByEmail(email: string): Promise<CustomerEntity>;
+  findOneByPhone(phone: string): Promise<CustomerEntity>;
+  findByState(state: boolean): Promise<CustomerEntity[]>;
+  findByFullName(fullName: string): Promise<CustomerEntity[]>;
 }

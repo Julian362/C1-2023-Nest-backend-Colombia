@@ -1,10 +1,10 @@
-import { IsNumberString, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsNumberString, IsString, MaxLength } from 'class-validator';
 
 export class TransferDTO {
-  @IsUUID()
+  @IsNumberString()
   outComeId: string;
-
-  @IsUUID()
+  
+  @IsNumberString()
   inComeId: string;
 
   @IsNumberString()
